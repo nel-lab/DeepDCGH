@@ -39,7 +39,7 @@ def get_gan_network(discriminator, shape, generator, optimizer, vgg_loss):
 # for more info use $python train.py -h
 def train(epochs, batch_size, input_dir, output_dir, model_save_dir, number_of_images, train_test_ratio):
     
-    x_train_lr, x_train_hr, x_test_lr, x_test_hr = Utils.load_training_data(input_dir, '.jpg', number_of_images, train_test_ratio) 
+    x_train_lr, x_train_hr, x_test_lr, x_test_hr = Utils.load_training_data(input_dir, '.jpg', number_of_images, train_test_ratio)
     loss = VGG_LOSS(image_shape)  
     
     batch_count = int(x_train_hr.shape[0] / batch_size)
@@ -47,7 +47,7 @@ def train(epochs, batch_size, input_dir, output_dir, model_save_dir, number_of_i
     
     generator = Generator(shape).generator()
     discriminator = Discriminator(image_shape).discriminator()
-
+    
     optimizer = Utils_model.get_optimizer()
     generator.compile(loss=loss.vgg_loss, optimizer=optimizer)
     discriminator.compile(loss="binary_crossentropy", optimizer=optimizer)
@@ -56,7 +56,7 @@ def train(epochs, batch_size, input_dir, output_dir, model_save_dir, number_of_i
     
     loss_file = open(model_save_dir + 'losses.txt' , 'w+')
     loss_file.close()
-
+    
     for e in range(1, epochs+1):
         print ('-'*15, 'Epoch %d' % e, '-'*15)
         for _ in tqdm(range(batch_count)):
@@ -79,7 +79,7 @@ def train(epochs, batch_size, input_dir, output_dir, model_save_dir, number_of_i
             rand_nums = np.random.randint(0, x_train_hr.shape[0], size=batch_size)
             image_batch_hr = x_train_hr[rand_nums]
             image_batch_lr = x_train_lr[rand_nums]
-
+            
             gan_Y = np.ones(batch_size) - np.random.random_sample(batch_size)*0.2
             discriminator.trainable = False
             gan_loss = gan.train_on_batch(image_batch_lr, [image_batch_hr,gan_Y])

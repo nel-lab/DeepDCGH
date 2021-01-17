@@ -7,37 +7,32 @@
 #python_version  :3.5.4 
 
 # Modules
-from keras.layers import Dense
-from keras.layers.core import Activation
-from keras.layers.normalization import BatchNormalization
-from keras.layers.convolutional import UpSampling2D
-from keras.layers.core import Flatten
-from keras.layers import Input
-from keras.layers.convolutional import Conv2D, Conv2DTranspose
-from keras.models import Model
-from keras.layers.advanced_activations import LeakyReLU, PReLU
-from keras.layers import add
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Activation
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import UpSampling2D
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Input
+from tensorflow.keras.layers import Conv2D, Conv2DTranspose
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import LeakyReLU, PReLU
+from tensorflow.keras.layers import add
 
 
 # Residual block
 def res_block_gen(model, kernal_size, filters, strides):
-    
     gen = model
-    
     model = Conv2D(filters = filters, kernel_size = kernal_size, strides = strides, padding = "same")(model)
     model = BatchNormalization(momentum = 0.5)(model)
     # Using Parametric ReLU
     model = PReLU(alpha_initializer='zeros', alpha_regularizer=None, alpha_constraint=None, shared_axes=[1,2])(model)
     model = Conv2D(filters = filters, kernel_size = kernal_size, strides = strides, padding = "same")(model)
     model = BatchNormalization(momentum = 0.5)(model)
-        
     model = add([gen, model])
-    
     return model
     
     
 def up_sampling_block(model, kernal_size, filters, strides):
-    
     # In place of Conv2D and UpSampling2D we can also use Conv2DTranspose (Both are used for Deconvolution)
     # Even we can have our own function for deconvolution (i.e one made in Utils.py)
     #model = Conv2DTranspose(filters = filters, kernel_size = kernal_size, strides = strides, padding = "same")(model)
@@ -49,7 +44,6 @@ def up_sampling_block(model, kernal_size, filters, strides):
 
 
 def discriminator_block(model, filters, kernel_size, strides):
-    
     model = Conv2D(filters = filters, kernel_size = kernel_size, strides = strides, padding = "same")(model)
     model = BatchNormalization(momentum = 0.5)(model)
     model = LeakyReLU(alpha = 0.2)(model)
@@ -86,7 +80,7 @@ class Generator(object):
 	    
 	    model = Conv2D(filters = 3, kernel_size = 9, strides = 1, padding = "same")(model)
 	    model = Activation('tanh')(model)
-	   
+	    
 	    generator_model = Model(inputs = gen_input, outputs = model)
         
 	    return generator_model
