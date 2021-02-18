@@ -70,20 +70,12 @@ def update_indexes(img_idx, method_idx, up_or_down, max_img, max_method):
                 pass
             else:
                 img_idx -= 1
+                method_idx = max_method
         else:
             method_idx -= 1
         
     
     return img_idx, method_idx
-
-# def split_data(f):
-#     keys = list(f.keys())
-#     gs = [k for k in keys if 'GS' in k]
-#     novo = [k for k in keys if 'NOVO' in k]
-#     deep = [k for k in keys if 'Deep' in k]
-#     return []
-
-
 
 
 file = sg.popup_get_file('Image file to open', default_path='')
@@ -118,18 +110,17 @@ window = sg.Window('Image Score Recording', layout, return_keyboard_events=True,
 
 img_index = 0
 method_index = 0
-q = max_qual//2
 
 with h5.File(file, 'r') as f:
     keys = sorted(list(f.keys()).remove('OG'))
+    qs = [max_qual//2]*len(keys)
     df = pd.DataFrame()
     
     while True:
         
-        og = f['OG'][img_index]
-        cgh = f[keys[method_index]][img_index]
-        # for method in keys:
-        #     cgh = f[method]
+        og = f['OG'][img_index, :, :]
+        max_img = f['OG'].shape[0]
+        cgh = f[keys[method_index]][img_index, :, :]
         
         # read the form
         event, values = window.read()
@@ -138,10 +129,12 @@ with h5.File(file, 'r') as f:
             break
         
         elif event in list(keypad_mapping.keys()):
-            All_Qs[i] = keypad_mapping[event]
-            i += 1
-            if i >= total_num:
-                break # TODO popup
+            qs[method_index] = keypad_mapping[event]
+            img_idx, method_idx = update_indexes(img_index,
+                                                 method_index,
+                                                 True,#up
+                                                 max_img = max_img,
+                                                 max_method = len(keys))
         
         if (event == 'Next' or 'Right:' in event) and 'KP' not in event:
             All_Qs[i] = values['_Score_']
