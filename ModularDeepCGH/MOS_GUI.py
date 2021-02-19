@@ -6,7 +6,7 @@ import io
 import numpy as np
 import h5py as h5
 import pandas as pd
-max_qual = 10
+max_qual = 9
 q = max_qual//2
 count = 0
 
@@ -70,9 +70,11 @@ def getORcheckDF(file, num_images, methods):
         for i in range(num_images):
             for j, method in enumerate(methods):
                 if df[method][i] == 123:
+                    df[method][i] = q
                     return df, i, j
     else:
         df = pd.DataFrame(data = np.ones((num_images, len(methods)), dtype=np.uint8)*123, columns = methods)
+        df[methods[0]][0] = q
         return df, 0, 0
 
 
@@ -88,19 +90,21 @@ with h5.File(file, 'r') as f:
     method_names.remove('OG')
     method_names = sorted(method_names)
 
-    progressbar_elem = sg.ProgressBar(num_images*len(method_names), orientation='h', size=(100, 20), key='progbar')
-    OG_elem = sg.Image(data = get_img_data(ogs[0], first = True), size = (512,512))
-    CGH_elem = sg.Image(data = get_img_data(f[method_names[0]][0], first = True), size = (512,512))
+    dataFrame, img_index, method_index = getORcheckDF(file, num_images, method_names)
+
+    progressbar_elem = sg.ProgressBar(num_images*len(method_names), orientation='h', size=(80, 20), key='progbar')
+    OG_elem = sg.Image(data = get_img_data(ogs[img_index], first = True), size = (512,512))
+    CGH_elem = sg.Image(data = get_img_data(f[method_names[method_index]][img_index], first = True), size = (512,512))
     slider_elem = sg.Slider(range = (0, max_qual),
-                            default_value=max_qual//2,
+                            default_value=q,
                             key = '_SLIDER_',
                             orientation = 'h',
                             enable_events = True,
                             disable_number_display = False,
-                            size = (150,20))
+                            size = (80, 20))
 
     layout = [[progressbar_elem],
-              [sg.T('Original Image', size = (100, 1)), sg.T('Rate this hologram', size = (20, 1))],
+              [sg.T('Original Image', size = (85, 1)), sg.T('Rate this hologram', size = (20, 1))],
               [OG_elem, CGH_elem],
               [sg.T('Low Quality'), slider_elem, sg.T('Best Quality')],
               [sg.Button('Prev', size=(8, 2)),
@@ -110,13 +114,23 @@ with h5.File(file, 'r') as f:
     window = sg.Window('Image Scoring Software', layout, return_keyboard_events=True,
                        location=(0, 0), use_default_focus=False)
 
-    dataFrame, img_index, method_index = getORcheckDF(file, num_images, method_names)
-    
-    while True:        
+    while True:
         # read the form
         event, values = window.read()
         # perform button and keyboard operations
         if event == sg.WIN_CLOSED:
+            img_index, method_index = update_indexes(img_index,
+                                                 method_index,
+                                                 True,#up
+                                                 max_img = num_images,
+                                                 max_method = len(method_names))
+            if dataFrame[method_names[method_index]][img_index] == 123:
+                img_index, method_index = update_indexes(img_index,
+                                                     method_index,
+                                                     False,#up
+                                                     max_img = num_images,
+                                                     max_method = len(method_names))
+                dataFrame[method_names[method_index]][img_index] = 123
             break
         
         elif event in list(keypad_mapping.keys()):
@@ -128,8 +142,8 @@ with h5.File(file, 'r') as f:
                                                  True,#up
                                                  max_img = num_images,
                                                  max_method = len(method_names))
-            dataFrame[method_names[method_index]][img_index] = q
-            count += 1 
+            if dataFrame[method_names[method_index]][img_index] == 123:
+                dataFrame[method_names[method_index]][img_index] = q
         
         elif (event == 'Next' or 'Right:' in event) and 'KP' not in event:
             dataFrame[method_names[method_index]][img_index] = values['_Score_']
@@ -140,8 +154,8 @@ with h5.File(file, 'r') as f:
                                                  True,#up
                                                  max_img = num_images,
                                                  max_method = len(method_names))
-            dataFrame[method_names[method_index]][img_index] = q
-            count += 1
+            if dataFrame[method_names[method_index]][img_index] == 123:
+                dataFrame[method_names[method_index]][img_index] = q
             
         elif (event == 'Prev' or 'Left:' in event) and 'KP' not in event:
             dataFrame[method_names[method_index]][img_index] = values['_Score_']
@@ -150,7 +164,6 @@ with h5.File(file, 'r') as f:
                                                  False,#up
                                                  max_img = num_images,
                                                  max_method = len(method_names))
-            count -= 1
         
         elif event == '_SLIDER_':
             dataFrame[method_names[method_index]][img_index] = values['_SLIDER_']
@@ -169,16 +182,16 @@ with h5.File(file, 'r') as f:
         
         window['_SLIDER_'].update(dataFrame[method_names[method_index]][img_index])
         window['_Score_'].update(dataFrame[method_names[method_index]][img_index])
+        count = (img_index) * len(method_names) + method_index
         window['progbar'].update(count)
         # update window with new image
         OG_elem.update(data=get_img_data(ogs[img_index], first=False))
         CGH_elem.update(data=get_img_data(f[method_names[method_index]][img_index], first=False))
         if count % len(method_names) == 0:
-            dataFrame.to_csv(file.replace('.h5', '.csv'))
+            dataFrame.to_csv(file.replace('.h5', '.csv'), index=False)
             
-dataFrame.to_csv(file.replace('.h5', '.csv'))
+dataFrame.to_csv(file.replace('.h5', '.csv'), index=False)
 window.close()
-
 
 #%%
 # import numpy as np
