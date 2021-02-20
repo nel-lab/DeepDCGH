@@ -74,11 +74,11 @@ def create_datasets(method,
             print('no keys found')
             dsets['OG'] = f.create_dataset('OG', shape=(N,)+shape, dtype=np.uint16)
             og = True
-
+            
         assert len(names) != 0, "Data already exists in the specified file:"
 
         for name in names:
-            dsets[name] = f.create_dataset(name, shape=(N,)+shape, dtype=np.uint16)
+            dsets[name] = f.create_dataset(name, shape=(N,)+shape, dtype=np.float32)
 
         for ind in tqdm(range(N)):
             if og:
@@ -93,15 +93,14 @@ def create_datasets(method,
                 dsets['OG'][ind] = np.round(img).astype(np.uint16)
             else:
                 img = f['OG'][ind].astype(np.float32)
-                img -= img.min()
                 img /= img.max()
-
-            slms, amps = method(img, Ks)
+            
+            slms, amps = method(img.astype(np.float32), Ks)
             for slm, amp, k in zip(slms, amps, Ks):
-                slm = np.array(normalize_minmax(slm) * 2**16, dtype=np.uint16)
+                slm = normalize_minmax(slm).numpy()
                 dsets["{}_P_{}".format(dset_name, str(k))][ind] = slm
                 if not phase_only:
-                    amp = np.array(normalize_minmax(amp) * 2**16, dtype=np.uint16)
+                    amp = normalize_minmax(amp).numpy()
                     dsets["{}_A_{}".format(dset_name, str(k))][ind] = amp
 
 @tf.function
@@ -113,17 +112,14 @@ def normalize_minmax(img):
 
 @tf.function
 def gs(img, Ks):
-    rand_phi = tf.random.uniform(img.shape)
+    phi = tf.random.uniform(img.shape) * np.pi
     slm_solutions = []
     amps = []
 
     # print("right before first minmax image size is {}".format(img.shape))
     img = normalize_minmax(img)
     for k in range(Ks[-1]):
-        if k != 0:
-            img_cf = tf.complex(img, 0.) * tf.math.exp(tf.complex(0., phi))
-        else:
-            img_cf = tf.complex(img, 0.) * tf.math.exp(tf.complex(0., rand_phi))
+        img_cf = tf.complex(img, 0.) * tf.math.exp(tf.complex(0., phi))
 
         slm_cf = tf.signal.ifft2d(tf.signal.ifftshift(img_cf))
         slm_phi = tf.math.angle(slm_cf)
@@ -134,7 +130,6 @@ def gs(img, Ks):
             slm_solutions.append(slm_phi)
             amps.append(tf.math.abs(img_cf))
     slm_solutions.append(slm_phi)
-
     amps.append(normalize_minmax(tf.math.abs(img_cf)))
     return slm_solutions, amps
 

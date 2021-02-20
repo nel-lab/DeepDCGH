@@ -7,16 +7,16 @@
 #python_version  :3.5.4 
 
 # Modules
-from keras.layers import Dense
-from keras.layers.core import Activation
-from keras.layers.normalization import BatchNormalization
-from keras.layers.convolutional import UpSampling2D
-from keras.layers.core import Flatten
-from keras.layers import Input
-from keras.layers.convolutional import Conv2D, Conv2DTranspose
-from keras.models import Model
-from keras.layers.advanced_activations import LeakyReLU, PReLU
-from keras.layers import add
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers.core import Activation
+from tensorflow.keras.layers.normalization import BatchNormalization
+from tensorflow.keras.layers.convolutional import UpSampling2D
+from tensorflow.keras.layers.core import Flatten
+from tensorflow.keras.layers import Input
+from tensorflow.keras.layers.convolutional import Conv2D, Conv2DTranspose
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers.advanced_activations import LeakyReLU, PReLU
+from tensorflow.keras.layers import add
 
 
 # Residual block

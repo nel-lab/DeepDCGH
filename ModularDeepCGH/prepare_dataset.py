@@ -6,7 +6,7 @@ from utils import create_datasets, novocgh, gs
 import h5py as h5
 import matplotlib.pyplot as plt
 
-N = 1000
+N = 50
 size = (512, 512)
 image_path = '/storage1/datasets/natural_images/COCO/train2017'
 filename = '/nvme/datasets/natural_images/COCO/COCO2017_Size{}_N{}.h5'.format(size[0], N)
@@ -22,7 +22,7 @@ create_datasets(gs,
                 img_format = 'jpg',
                 shape = size,
                 del_existing = True,
-                phase_only = True,
+                phase_only = False,
                 N = N)
 
 #% NOVO-CGH algorithm
@@ -34,7 +34,7 @@ create_datasets(novocgh,
                 img_format = 'jpg',
                 shape = size,
                 del_existing = True,
-                phase_only = True,
+                phase_only = False,
                 N = N)
 
 #%%

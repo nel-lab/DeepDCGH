@@ -17,7 +17,22 @@ keypad_mapping = {'KP_End:87' : 1,'KP_Down:88' : 2,'KP_Next:89' : 3,'KP_Left:83'
                     '8:10' : 8,'9:10' : 9,'0:19' : 0,'1' : 1,'2' : 2,'3' : 3,
                     '4' : 4,'5' : 5,'6' : 6,'7' : 7,'8' : 8,'9' : 9,'0' : 0}
 
-def get_img_data(data, maxsize=(1024, 1024), first=False):
+def fft(phase):
+    phase = phase.astype('float32')
+    phase /= phase.max()
+    phase *= np.pi
+    slm_cf = np.exp(1j*phase)
+    img = np.abs(np.fft.fftshift(np.fft.fft2(slm_cf)))
+    img -= img.min()
+    img /= img.max()
+    img *= 255
+    img = img.astype('uint8')
+    return img
+    
+
+def get_img_data(data, maxsize=(1024, 1024), first=False, do_fft = False):
+    if do_fft:
+        data = fft(data)
     img = Image.fromarray(data)
     img.thumbnail(maxsize)
     if first:                     # tkinter is inactive the first time
@@ -26,10 +41,6 @@ def get_img_data(data, maxsize=(1024, 1024), first=False):
         del img
         return bio.getvalue()
     return ImageTk.PhotoImage(img)
-
-
-def random_image():
-    return np.round(np.random.rand(512, 512, 3)*255).astype(np.uint8)
 
 def update_indexes(img_idx, method_idx, up_or_down, max_img, max_method):
     if up_or_down:
@@ -93,8 +104,8 @@ with h5.File(file, 'r') as f:
     dataFrame, img_index, method_index = getORcheckDF(file, num_images, method_names)
 
     progressbar_elem = sg.ProgressBar(num_images*len(method_names), orientation='h', size=(80, 20), key='progbar')
-    OG_elem = sg.Image(data = get_img_data(ogs[img_index], first = True), size = (512,512))
-    CGH_elem = sg.Image(data = get_img_data(f[method_names[method_index]][img_index], first = True), size = (512,512))
+    OG_elem = sg.Image(data = get_img_data(ogs[img_index], first = True, do_fft = False), size = (512,512))
+    CGH_elem = sg.Image(data = get_img_data(f[method_names[method_index]][img_index], first = True, do_fft = True), size = (512,512))
     slider_elem = sg.Slider(range = (0, max_qual),
                             default_value=q,
                             key = '_SLIDER_',
@@ -266,6 +277,107 @@ window.close()
 #     method_names = list(f.keys())
 #     method_names.remove('OG')
 #     method_names = sorted(method_names)
+
+
+
+
+#%%
+import matplotlib.pyplot as plt
+import tensorflow as tf
+import h5py as h5
+import numpy as np
+file = '/home/hoss/Documents/COCO2017_Size512_N50.h5'
+cghs = []
+names = []
+with h5.File(file, 'r') as f:
+    images = f['OG'][:]
+    for k in f.keys():
+        if k != 'OG':
+            names.append(k)
+            cghs.append(f[k][:])
+
+#%%
+def fft(phase):
+    slm_cf = tf.math.exp(tf.complex(0., phase))
+    img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
+    img = tf.math.abs(img_cf)
+    return img
+
+#%%
+for cgh, name in zip(cghs, names):
+    # plt.imshow(cgh[0])
+    # plt.title(name)
+    # plt.show()
+    if '_A_' not in name:
+        img = fft(cgh[0].astype(np.float32)).numpy()
+        plt.imshow(img)
+        plt.show()
+        plt.hist(img.reshape(-1), 100)
+        plt.show()
+
+#%%
+@tf.function
+def normalize_minmax(img):
+    img -= tf.reduce_min(tf.cast(img, tf.float32), axis=[0, 1], keepdims=True)
+    img /= tf.reduce_max(img, axis=[0, 1], keepdims=True)
+    return img
+
+
+@tf.function
+def gs(img, Ks):
+    phi = tf.random.uniform(img.shape) * np.pi
+    slm_solutions = []
+    amps = []
+
+    # print("right before first minmax image size is {}".format(img.shape))
+    img = normalize_minmax(img)
+    for k in range(Ks[-1]):
+        img_cf = tf.complex(img, 0.) * tf.math.exp(tf.complex(0., phi))
+
+        slm_cf = tf.signal.ifft2d(tf.signal.ifftshift(img_cf))
+        slm_phi = tf.math.angle(slm_cf)
+        slm_cf = tf.math.exp(tf.complex(0., slm_phi))
+        img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
+        phi = tf.math.angle(img_cf)
+        if k in Ks[:-1]:
+            slm_solutions.append(slm_phi)
+            amps.append(tf.math.abs(img_cf))
+    slm_solutions.append(slm_phi)
+    amps.append(normalize_minmax(tf.math.abs(img_cf)))
+    return slm_solutions, amps
+
+#%%
+img = imgages[0]
+slm, amp = gs()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
