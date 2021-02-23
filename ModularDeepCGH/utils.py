@@ -27,7 +27,22 @@ def create_datasets(method,
                     shape = (512,512),
                     del_existing = False,
                     phase_only = True,
-                    N = -1):
+                    delete = True,
+                    N = -1,
+                    dtype = np.uint16):
+    
+    if dtype == np.uint8:
+        mul = 255
+    elif dtype == np.uint16:
+        mul = -1+2**16
+    else:
+        print("dtype not supported. Using uint16")
+        dtype = np.uint16
+        mul = -1+2**16
+    
+    if delete and os.path.isfile(filename):
+        os.remove(filename)
+
     Ks = ks.copy()
     files = sorted(glob(os.path.join(image_path, '*.' + img_format)))
     print("{} files found.".format(len(files)))
@@ -72,13 +87,13 @@ def create_datasets(method,
 
         else:
             print('no keys found')
-            dsets['OG'] = f.create_dataset('OG', shape=(N,)+shape, dtype=np.uint16)
+            dsets['OG'] = f.create_dataset('OG', shape=(N,)+shape, dtype=dtype)
             og = True
             
         assert len(names) != 0, "Data already exists in the specified file:"
 
         for name in names:
-            dsets[name] = f.create_dataset(name, shape=(N,)+shape, dtype=np.float32)
+            dsets[name] = f.create_dataset(name, shape=(N,)+shape, dtype=dtype)
 
         for ind in tqdm(range(N)):
             if og:
@@ -89,23 +104,25 @@ def create_datasets(method,
 
                 if img.shape != shape:
                     img = smartResize(img, shape)
-                img *= 2**16
-                dsets['OG'][ind] = np.round(img).astype(np.uint16)
+                img *= mul
+                dsets['OG'][ind] = np.round(img).astype(dtype)
             else:
                 img = f['OG'][ind].astype(np.float32)
                 img /= img.max()
             
             slms, amps = method(img.astype(np.float32), Ks)
             for slm, amp, k in zip(slms, amps, Ks):
-                slm = normalize_minmax(slm).numpy()
-                dsets["{}_P_{}".format(dset_name, str(k))][ind] = slm
+                slm = np.mod(slm, 2*np.pi)
+                slm = normalize_minmax(slm).numpy()*mul
+                dsets["{}_P_{}".format(dset_name, str(k))][ind] = np.round(slm).astype(dtype)
                 if not phase_only:
-                    amp = normalize_minmax(amp).numpy()
-                    dsets["{}_A_{}".format(dset_name, str(k))][ind] = amp
+                    amp = normalize_minmax(amp).numpy()*mul
+                    dsets["{}_A_{}".format(dset_name, str(k))][ind] = np.round(amp).astype(dtype)
 
 @tf.function
 def normalize_minmax(img):
-    img -= tf.reduce_min(tf.cast(img, tf.float32), axis=[0, 1], keepdims=True)
+    img = tf.cast(img, tf.float32)
+    img -= tf.reduce_min(img, axis=[0, 1], keepdims=True)
     img /= tf.reduce_max(img, axis=[0, 1], keepdims=True)
     return img
 
@@ -115,28 +132,40 @@ def gs(img, Ks):
     phi = tf.random.uniform(img.shape) * np.pi
     slm_solutions = []
     amps = []
-
-    # print("right before first minmax image size is {}".format(img.shape))
+    
     img = normalize_minmax(img)
     for k in range(Ks[-1]):
         img_cf = tf.complex(img, 0.) * tf.math.exp(tf.complex(0., phi))
-
+        
         slm_cf = tf.signal.ifft2d(tf.signal.ifftshift(img_cf))
         slm_phi = tf.math.angle(slm_cf)
         slm_cf = tf.math.exp(tf.complex(0., slm_phi))
         img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
         phi = tf.math.angle(img_cf)
         if k in Ks[:-1]:
-            slm_solutions.append(slm_phi)
+            slm_solutions.append(normalize_minmax(slm_phi))
             amps.append(tf.math.abs(img_cf))
     slm_solutions.append(slm_phi)
     amps.append(normalize_minmax(tf.math.abs(img_cf)))
     return slm_solutions, amps
 
+
+def lens(phi_slm):
+    slm_cf = tf.math.exp(tf.complex(0., phi_slm))
+    img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
+    return tf.math.abs(img_cf)
+
+
+@tf.function
+def __normalize_minmax(img):
+    img -= tf.reduce_min(tf.cast(img, tf.float32), axis=[0, 1], keepdims=True)
+    img /= tf.reduce_max(img, axis=[0, 1], keepdims=True)
+    return img
+
 @tf.function
 def __gs(img):
     rand_phi = tf.random.uniform(img.shape)
-    img = normalize_minmax(img)
+    img = __normalize_minmax(img)
     img_cf = tf.complex(img, 0.) * tf.math.exp(tf.complex(0., rand_phi))
     slm_cf = tf.signal.ifft2d(tf.signal.ifftshift(img_cf))
     slm_phi = tf.math.angle(slm_cf)
@@ -156,7 +185,7 @@ def novocgh(img, Ks, lr = 0.1):
     opt = tf.keras.optimizers.Adam(learning_rate = lr)
     img = tf.convert_to_tensor(img)
 
-    def prop(phi_slm):
+    def loss_(phi_slm):
         slm_cf = tf.math.exp(tf.complex(0., phi_slm))
         img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
         return tf.math.abs(img_cf)
@@ -170,11 +199,20 @@ def novocgh(img, Ks, lr = 0.1):
     for i in range(Ks[-1]+1):
         opt.minimize(loss, var_list=[phi_slm])
         if i in Ks:
-            amps.append(prop(phi_slm).numpy())
+            amps.append(loss_(phi_slm).numpy())
             slms.append(phi_slm.numpy())
     return slms, amps
 
-def lens(phi_slm):
-    slm_cf = tf.math.exp(tf.complex(0., phi_slm))
-    img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
-    return tf.math.abs(img_cf)
+
+
+
+
+
+
+
+
+
+
+
+
+

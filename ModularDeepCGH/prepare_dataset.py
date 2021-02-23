@@ -1,41 +1,46 @@
 dev_num = 0
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = str(dev_num)
-from deepcgh import DeepCGH, DeepCGH_Datasets
-from utils import create_datasets, novocgh, gs
+from utils import create_datasets, gs
+from sgd_holography import novocgh
 import h5py as h5
 import matplotlib.pyplot as plt
+import numpy as np
 
-N = 50
+N = 1000
 size = (512, 512)
 image_path = '/storage1/datasets/natural_images/COCO/train2017'
 filename = '/nvme/datasets/natural_images/COCO/COCO2017_Size{}_N{}.h5'.format(size[0], N)
 
-Ks = list(range(0, 11, 5))
+Ks_GS = [1, 100]#list(range(0, 201, 5))
+Ks_NOVO = [20, 200]#list(range(0, 502, 100))
 
 #% GS algorithm
 create_datasets(gs,
                 image_path,
                 filename,
                 'GS',
-                ks = Ks,
+                ks = Ks_GS,
                 img_format = 'jpg',
                 shape = size,
                 del_existing = True,
-                phase_only = False,
-                N = N)
+                phase_only = True,
+                N = N,
+                dtype = np.uint8)
 
 #% NOVO-CGH algorithm
 create_datasets(novocgh,
                 image_path,
                 filename,
                 "NOVO",
-                ks = Ks,
+                ks = Ks_NOVO,
                 img_format = 'jpg',
                 shape = size,
                 del_existing = True,
-                phase_only = False,
-                N = N)
+                phase_only = True,
+                delete=False,
+                N = N,
+                dtype = np.uint8)
 
 #%%
 with h5.File(filename, 'a') as f:

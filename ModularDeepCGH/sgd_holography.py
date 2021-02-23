@@ -28,7 +28,7 @@ def __accuracy(y_true, y_pred):
     return 1 - (tf.reduce_sum(y_pred * y_true, axis = [0, 1])+1)/(denom+1)
 
 
-def novocgh(img, Ks, lr = 0.01):
+def novocgh(img, Ks, lr = 0.1):
     slms = []
     amps = []
     phi = __gs(img)
@@ -59,9 +59,48 @@ def novocgh(img, Ks, lr = 0.01):
 
 
 #%%
-
-
-
+# import matplotlib.pyplot as plt
+# import tensorflow as tf
+# import h5py as h5
+# import numpy as np
+# file = '/home/hoss/Documents/COCO2017_Size512_N50.h5'
+# cghs = []
+# names = []
+# with h5.File(file, 'r') as f:
+#     images = f['OG'][:]
+#     for k in f.keys():
+#         if k != 'OG':
+#             names.append(k)
+#             cghs.append(f[k][:])
+# img = images[10].astype(np.float32)
+# img /= img.max()
+#
+# #%%
+# plt.imshow(img)
+# plt.show()
+#
+# #%%
+# def fft(phase):
+#     slm_cf = tf.math.exp(tf.complex(0., phase))
+#     img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
+#     img = tf.math.abs(img_cf)
+#     return img
+#
+# #%%
+# final_slms = []
+# slms, amps = novocgh(img, [1,15,40,100], lr=0.1)
+#
+# #%%
+# for it, phiii in enumerate(slms):
+#     # phi = (phiii.astype(np.float32) / phiii.max())*2*np.pi
+#     img_ = fft(phiii).numpy()
+#     plt.imshow(img_)
+#     plt.title(it)
+#     plt.show()
+# plt.imshow(img)
+# plt.show()
+    
+#%%
 
 
 

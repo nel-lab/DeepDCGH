@@ -52,7 +52,6 @@ class DeepCGH_Datasets(object):
             self.compression = params['compression']
         except:
             assert False, 'Not all parameters are provided!'
-            
         self.__check_avalability()
         
     
@@ -74,7 +73,7 @@ class DeepCGH_Datasets(object):
         else:
             print('Data already exists.')
            
-            
+
     def __get_line(self, shape, start, end):
         img = np.zeros(shape, dtype=np.float32)
         rr, cc, val = line_aa(start[0], start[1], end[0], end[1])

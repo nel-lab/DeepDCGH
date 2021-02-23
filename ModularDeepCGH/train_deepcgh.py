@@ -5,7 +5,7 @@ Created on Mon Jul 13 15:18:10 2020
 
 @author: hoss
 """
-dev_num = 2
+dev_num = 0
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = str(dev_num)
 import tensorflow as tf
@@ -18,9 +18,9 @@ from glob import glob
 retrain = True
 coordinates = False
 
-N = 50000
+N = 1000
 size = (512, 512)
-del_existing = False
+del_existing = True
 image_path = '/storage1/datasets/natural_images/COCO/train2017'
 filename = '/nvme/datasets/natural_images/COCO/COCO2017_Size{}_N{}.h5'.format(size[0], N)
 
@@ -65,40 +65,191 @@ dset.getDataset()
 # Estimator
 dcgh = DeepCGH(data, model)
 
-if retrain:
-    dcgh.train(dset)
+dcgh.train(dset)
 
 #%%
-names = []
-names.append("DeepCGH{}_A".format(data['object_type']))
-names.append("DeepCGH{}_P".format(data['object_type']))
-
+names = ["DeepCGH_{}_P".format(data['object_type'])]
+# names.append("DeepCGH{}_A".format(data['object_type']))
+dtype = np.uint8
+mul = -1+2**8
 with h5.File(filename, 'a') as f:
     dsets = {}
 
     keys = list(f.keys())
+    if del_existing and names[0] in keys:
+        print('Deleting old dataset...')
+        del f[names[0]]
 
-    # check if dataset already exists and inform
-    for k in keys:
-        if k in names:
-            print('{} already exists.'.format(k))
-            if del_existing:
-                print('Deleting old dataset...')
-                del f[k]
-            else:
-                print('Keeping old dataset.')
-                names.remove(k)
-
-    assert len(names) != 0, "Data already exists in the specified file:"
-
+    ogs = f['OG']
     for name in names:
-        dsets[name] = f.create_dataset(name, shape=(N,) + size, dtype=np.float32)
-
+        dsets[name] = f.create_dataset(name, shape=(ogs.shape[0],) + size, dtype=dtype)
     for ind in tqdm(range(N)):
-        img = f['OG'][ind].astype(np.float32)
-        img -= img.min()
+        img = ogs[ind].astype(np.float32)
         img /= img.max()
 
         ph = np.squeeze(dcgh.get_hologram(img[np.newaxis, ..., np.newaxis]))
-        dsets["DeepCGH{}_A".format(data['object_type'])][ind] = ph
-        dsets["DeepCGH{}_A".format(data['object_type'])][ind] = lens(ph)
+        ph = np.mod(ph, 2*np.pi)
+        ph -= ph.min()
+        ph /= ph.max()
+        ph *= mul
+        dsets["DeepCGH_{}_P".format(data['object_type'])][ind] = np.round(ph).astype(dtype)
+        # dsets["DeepCGH{}_A".format(data['object_type'])][ind] = lens(ph)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

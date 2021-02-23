@@ -6,9 +6,34 @@ import io
 import numpy as np
 import h5py as h5
 import pandas as pd
+import random
+
 max_qual = 9
 q = max_qual//2
-count = 0
+
+def get_randomOrder(file, max_imgs, max_methods, methods):
+    order_file = file.replace('.h5', '_idx.csv')
+    qual_file = file.replace('.h5', '.csv')
+    if os.path.isfile(order_file) and os.path.isfile(qual_file):
+        quals = pd.read_csv(qual_file)
+        order = pd.read_csv(order_file)
+        for i in range(max_imgs*max_methods):
+            if not order['done'][i]:
+                return quals, order, i
+    else:
+        quals = pd.DataFrame(data = np.ones((max_imgs, max_methods), dtype=np.uint8)*123, columns = methods)
+        quals[methods[0]][0] = q
+        order = np.zeros((max_imgs*max_methods, 3), dtype=np.uint16)
+        count = 0
+        for i in range(max_imgs):
+            for j in range(max_methods):
+                order[count, 0] = i
+                order[count, 1] = j
+                count+=1
+        order = list(order)
+        random.shuffle(order)
+        order = pd.DataFrame(data = order, columns=['image', 'method', 'done'])
+        return quals, order, 0
 
 keypad_mapping = {'KP_End:87' : 1,'KP_Down:88' : 2,'KP_Next:89' : 3,'KP_Left:83' : 4,
                     'KP_Begin:84' : 5,'KP_Right:85' : 6,'KP_Home:79' : 7,'KP_Up:80' : 8,
@@ -16,23 +41,9 @@ keypad_mapping = {'KP_End:87' : 1,'KP_Down:88' : 2,'KP_Next:89' : 3,'KP_Left:83'
                     '3:10' : 3,'4:10' : 4,'5:10' : 5,'6:10' : 6,'7:10' : 7,
                     '8:10' : 8,'9:10' : 9,'0:19' : 0,'1' : 1,'2' : 2,'3' : 3,
                     '4' : 4,'5' : 5,'6' : 6,'7' : 7,'8' : 8,'9' : 9,'0' : 0}
-
-def fft(phase):
-    phase = phase.astype('float32')
-    phase /= phase.max()
-    phase *= np.pi
-    slm_cf = np.exp(1j*phase)
-    img = np.abs(np.fft.fftshift(np.fft.fft2(slm_cf)))
-    img -= img.min()
-    img /= img.max()
-    img *= 255
-    img = img.astype('uint8')
-    return img
     
 
-def get_img_data(data, maxsize=(1024, 1024), first=False, do_fft = False):
-    if do_fft:
-        data = fft(data)
+def get_img_data(data, maxsize=(1024, 1024), first=False):
     img = Image.fromarray(data)
     img.thumbnail(maxsize)
     if first:                     # tkinter is inactive the first time
@@ -41,28 +52,6 @@ def get_img_data(data, maxsize=(1024, 1024), first=False, do_fft = False):
         del img
         return bio.getvalue()
     return ImageTk.PhotoImage(img)
-
-def update_indexes(img_idx, method_idx, up_or_down, max_img, max_method):
-    if up_or_down:
-        if method_idx == max_method-1:
-            if img_idx == max_img-1:
-                pass
-            else:
-                img_idx += 1
-                method_idx = 0
-        else:
-            method_idx += 1
-    else:
-        if method_idx == 0:
-            if img_idx == 0:
-                pass
-            else:
-                img_idx -= 1
-                method_idx = max_method-1
-        else:
-            method_idx -= 1
-    
-    return img_idx, method_idx
 
 
 def popup(message):
@@ -73,39 +62,26 @@ def popup(message):
     return file
 
 
-def getORcheckDF(file, num_images, methods):
-    df_file = file.replace('.h5', '.csv')
-    if os.path.isfile(df_file):
-        df = pd.read_csv(df_file)
-        
-        for i in range(num_images):
-            for j, method in enumerate(methods):
-                if df[method][i] == 123:
-                    df[method][i] = q
-                    return df, i, j
-    else:
-        df = pd.DataFrame(data = np.ones((num_images, len(methods)), dtype=np.uint8)*123, columns = methods)
-        df[methods[0]][0] = q
-        return df, 0, 0
-
-
 # get file address
 file = popup('Choose the file that contains images.')
 
 
 with h5.File(file, 'r') as f:
-    
+    count = 0
     ogs = f['OG']
     num_images = ogs.shape[0]
     method_names = list(f.keys())
     method_names.remove('OG')
     method_names = sorted(method_names)
-
-    dataFrame, img_index, method_index = getORcheckDF(file, num_images, method_names)
-
+    
+    quals, order, count = get_randomOrder(file, num_images, len(method_names), method_names)
+    img_index = order['image'][count]
+    method_index = order['method'][count]
+    quals[method_names[method_index]][img_index] = q
+    
     progressbar_elem = sg.ProgressBar(num_images*len(method_names), orientation='h', size=(80, 20), key='progbar')
-    OG_elem = sg.Image(data = get_img_data(ogs[img_index], first = True, do_fft = False), size = (512,512))
-    CGH_elem = sg.Image(data = get_img_data(f[method_names[method_index]][img_index], first = True, do_fft = True), size = (512,512))
+    OG_elem = sg.Image(data = get_img_data(ogs[img_index], first = True), size = (512,512))
+    CGH_elem = sg.Image(data = get_img_data(f[method_names[method_index]][img_index], first = True), size = (512,512))
     slider_elem = sg.Slider(range = (0, max_qual),
                             default_value=q,
                             key = '_SLIDER_',
@@ -114,7 +90,7 @@ with h5.File(file, 'r') as f:
                             disable_number_display = False,
                             size = (80, 20))
 
-    layout = [[progressbar_elem],
+    layout = [[sg.T('Total Progress:'), progressbar_elem],
               [sg.T('Original Image', size = (85, 1)), sg.T('Rate this hologram', size = (20, 1))],
               [OG_elem, CGH_elem],
               [sg.T('Low Quality'), slider_elem, sg.T('Best Quality')],
@@ -124,84 +100,78 @@ with h5.File(file, 'r') as f:
     
     window = sg.Window('Image Scoring Software', layout, return_keyboard_events=True,
                        location=(0, 0), use_default_focus=False)
-
+    
     while True:
         # read the form
         event, values = window.read()
-        # perform button and keyboard operations
+        # perform button and keyboard operations 
         if event == sg.WIN_CLOSED:
-            img_index, method_index = update_indexes(img_index,
-                                                 method_index,
-                                                 True,#up
-                                                 max_img = num_images,
-                                                 max_method = len(method_names))
-            if dataFrame[method_names[method_index]][img_index] == 123:
-                img_index, method_index = update_indexes(img_index,
-                                                     method_index,
-                                                     False,#up
-                                                     max_img = num_images,
-                                                     max_method = len(method_names))
-                dataFrame[method_names[method_index]][img_index] = 123
+            img_index = order['image'][count+1]
+            method_index = order['method'][count+1]
+            if quals[method_names[method_index]][img_index] == 123 and order['order'][count+1]==0:
+                img_index = order['image'][count]
+                method_index = order['method'][count]
+                quals[method_names[method_index]][img_index] = 123
             break
         
         elif event in list(keypad_mapping.keys()):
-            dataFrame[method_names[method_index]][img_index] = keypad_mapping[event]
-            if img_index == num_images-1 and method_index == len(method_names)-1:
+            quals[method_names[method_index]][img_index] = keypad_mapping[event]
+            order['done'][count] = 1
+            # are we done yet?
+            if count == len(method_names)*num_images-1:
                 break
-            img_index, method_index = update_indexes(img_index,
-                                                 method_index,
-                                                 True,#up
-                                                 max_img = num_images,
-                                                 max_method = len(method_names))
-            if dataFrame[method_names[method_index]][img_index] == 123:
-                dataFrame[method_names[method_index]][img_index] = q
+            count += 1
+            img_index = order['image'][count]
+            method_index = order['method'][count]
+            if quals[method_names[method_index]][img_index] == 123:
+                quals[method_names[method_index]][img_index] = q
+            
         
         elif (event == 'Next' or 'Right:' in event) and 'KP' not in event:
-            dataFrame[method_names[method_index]][img_index] = values['_Score_']
-            if img_index == num_images-1 and method_index == len(method_names)-1:
+            quals[method_names[method_index]][img_index] = values['_Score_']
+            order['done'][count] = 1
+            if count == len(method_names)*num_images-1:
                 break
-            img_index, method_index = update_indexes(img_index,
-                                                 method_index,
-                                                 True,#up
-                                                 max_img = num_images,
-                                                 max_method = len(method_names))
-            if dataFrame[method_names[method_index]][img_index] == 123:
-                dataFrame[method_names[method_index]][img_index] = q
+            count += 1
+            img_index = order['image'][count]
+            method_index = order['method'][count]
+            if quals[method_names[method_index]][img_index] == 123:
+                quals[method_names[method_index]][img_index] = q
             
         elif (event == 'Prev' or 'Left:' in event) and 'KP' not in event:
-            dataFrame[method_names[method_index]][img_index] = values['_Score_']
-            img_index, method_index = update_indexes(img_index,
-                                                 method_index,
-                                                 False,#up
-                                                 max_img = num_images,
-                                                 max_method = len(method_names))
+            quals[method_names[method_index]][img_index] = values['_Score_']
+            order['done'][count] = 1
+            count -= 1
+            img_index = order['image'][count]
+            method_index = order['method'][count]
         
         elif event == '_SLIDER_':
-            dataFrame[method_names[method_index]][img_index] = values['_SLIDER_']
+            quals[method_names[method_index]][img_index] = values['_SLIDER_']
             
         elif 'Down' in event and 'KP' not in event:
-            if dataFrame[method_names[method_index]][img_index] == 0:
-                dataFrame[method_names[method_index]][img_index] = 0
+            if quals[method_names[method_index]][img_index] == 0:
+                quals[method_names[method_index]][img_index] = 0
             else:
-                dataFrame[method_names[method_index]][img_index] -= 1
+                quals[method_names[method_index]][img_index] -= 1
         
         elif 'Up' in event and 'KP' not in event:
-            if dataFrame[method_names[method_index]][img_index] == max_qual:
-                dataFrame[method_names[method_index]][img_index] = max_qual
+            if quals[method_names[method_index]][img_index] == max_qual:
+                quals[method_names[method_index]][img_index] = max_qual
             else:
-                dataFrame[method_names[method_index]][img_index] += 1
+                quals[method_names[method_index]][img_index] += 1
         
-        window['_SLIDER_'].update(dataFrame[method_names[method_index]][img_index])
-        window['_Score_'].update(dataFrame[method_names[method_index]][img_index])
-        count = (img_index) * len(method_names) + method_index
+        window['_SLIDER_'].update(quals[method_names[method_index]][img_index])
+        window['_Score_'].update(quals[method_names[method_index]][img_index])
         window['progbar'].update(count)
         # update window with new image
         OG_elem.update(data=get_img_data(ogs[img_index], first=False))
         CGH_elem.update(data=get_img_data(f[method_names[method_index]][img_index], first=False))
-        if count % len(method_names) == 0:
-            dataFrame.to_csv(file.replace('.h5', '.csv'), index=False)
+        if count % 5 == 0:
+            quals.to_csv(file.replace('.h5', '.csv'), index=False)
+            order.to_csv(file.replace('.h5', '_idx.csv'), index=False)
             
-dataFrame.to_csv(file.replace('.h5', '.csv'), index=False)
+quals.to_csv(file.replace('.h5', '.csv'), index=False)
+order.to_csv(file.replace('.h5', '_idx.csv'), index=False)
 window.close()
 
 #%%
@@ -281,90 +251,90 @@ window.close()
 
 
 
-#%%
-import matplotlib.pyplot as plt
-import tensorflow as tf
-import h5py as h5
-import numpy as np
-file = '/home/hoss/Documents/COCO2017_Size512_N50.h5'
-cghs = []
-names = []
-with h5.File(file, 'r') as f:
-    images = f['OG'][:]
-    for k in f.keys():
-        if k != 'OG':
-            names.append(k)
-            cghs.append(f[k][:])
+# #%%
+# import matplotlib.pyplot as plt
+# import tensorflow as tf
+# import h5py as h5
+# import numpy as np
+# file = '/home/hoss/Documents/datasets/COCO2017_Size512_N1000.h5'
+# cghs = []
+# names = []
+# with h5.File(file, 'r') as f:
+#     images = f['OG'][:]
+#     for k in f.keys():
+#         if k != 'OG':
+#             names.append(k)
+#             cghs.append(f[k][:])
+# img = images[9].astype(np.float32)
+# img /= img.max()
 
-#%%
-def fft(phase):
-    slm_cf = tf.math.exp(tf.complex(0., phase))
-    img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
-    img = tf.math.abs(img_cf)
-    return img
+# #%%
+# plt.imshow(img)
+# plt.show()
 
-#%%
-for cgh, name in zip(cghs, names):
-    # plt.imshow(cgh[0])
-    # plt.title(name)
-    # plt.show()
-    if '_A_' not in name:
-        img = fft(cgh[0].astype(np.float32)).numpy()
-        plt.imshow(img)
-        plt.show()
-        plt.hist(img.reshape(-1), 100)
-        plt.show()
+# #%%
+# def fft(phase):
+#     slm_cf = tf.math.exp(tf.complex(0., phase))
+#     img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
+#     img = tf.math.abs(img_cf)
+#     return img
 
-#%%
-@tf.function
-def normalize_minmax(img):
-    img -= tf.reduce_min(tf.cast(img, tf.float32), axis=[0, 1], keepdims=True)
-    img /= tf.reduce_max(img, axis=[0, 1], keepdims=True)
-    return img
+# #%%
+# set
+# for cgh, name in zip(cghs, names):
+#     # plt.imshow(cgh[0])
+#     # plt.title(name)
+#     # plt.show()
+#     phi = cgh[9].copy()
+#     # plt.hist(phi.reshape(-1), 100)
+#     # plt.title(name)
+#     # plt.show()
+#     if '_A_' not in name:
+#         phi = (phi.astype(np.float32) / phi.max())*2*np.pi
+#         img_ = fft(phi).numpy()
+#         plt.figure(figsize=(10,10))
+#         plt.imshow(img_)
+#         plt.title(name)
+#         plt.savefig(name+'1.png')
+#         plt.show()
+        
+#         # test: make it 8bit
+#         img_ -= img_.min()
+#         img_ /= img_.max()
+#         img_ *= 2**8
+#         img_ = np.round(img_).astype(np.uint8)
+        
+#         plt.figure(figsize=(10,10))
+#         plt.imshow(img_)
+#         plt.title(name)
+#         plt.savefig(name+'2.png')
+#         plt.show()
 
+# #%%
+# final_slms = []
+# slms, amps = novocgh(img, [5,400, 1000], lr=1)
+# for slm, amp, k in zip(slms, amps, [5,10,100]):
+#     final_slms.append(normalize_minmax(slm).numpy()*2*np.pi)
 
-@tf.function
-def gs(img, Ks):
-    phi = tf.random.uniform(img.shape) * np.pi
-    slm_solutions = []
-    amps = []
+# #%%
+# for it, phiii in enumerate(final_slms):
+#     phi = (phiii.astype(np.float32) / phi.max())*2*np.pi
+#     img_ = fft(phi).numpy()
+#     plt.imshow(img_)
+#     plt.title(it)
+#     plt.show()
+    
+# #%%
+# plt.imshow(img)
+# plt.show()
 
-    # print("right before first minmax image size is {}".format(img.shape))
-    img = normalize_minmax(img)
-    for k in range(Ks[-1]):
-        img_cf = tf.complex(img, 0.) * tf.math.exp(tf.complex(0., phi))
+# plt.imshow(amps[2])
+# plt.show()
 
-        slm_cf = tf.signal.ifft2d(tf.signal.ifftshift(img_cf))
-        slm_phi = tf.math.angle(slm_cf)
-        slm_cf = tf.math.exp(tf.complex(0., slm_phi))
-        img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
-        phi = tf.math.angle(img_cf)
-        if k in Ks[:-1]:
-            slm_solutions.append(slm_phi)
-            amps.append(tf.math.abs(img_cf))
-    slm_solutions.append(slm_phi)
-    amps.append(normalize_minmax(tf.math.abs(img_cf)))
-    return slm_solutions, amps
+# plt.imshow(img_)
+# plt.show()
 
-#%%
-img = imgages[0]
-slm, amp = gs()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# #%%
 
 
 
