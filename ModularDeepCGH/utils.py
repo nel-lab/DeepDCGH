@@ -130,13 +130,14 @@ def normalize_minmax(img):
 @tf.function
 def gs(img, Ks):
     phi = tf.random.uniform(img.shape) * np.pi
+    slm_phi = tf.random.uniform(img.shape)
+    img_cf = tf.complex(tf.random.uniform(img.shape), 0.)
     slm_solutions = []
     amps = []
     
     img = normalize_minmax(img)
     for k in range(Ks[-1]):
         img_cf = tf.complex(img, 0.) * tf.math.exp(tf.complex(0., phi))
-        
         slm_cf = tf.signal.ifft2d(tf.signal.ifftshift(img_cf))
         slm_phi = tf.math.angle(slm_cf)
         slm_cf = tf.math.exp(tf.complex(0., slm_phi))

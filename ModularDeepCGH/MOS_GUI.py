@@ -8,8 +8,9 @@ import h5py as h5
 import pandas as pd
 import random
 
-max_qual = 9
-q = max_qual//2
+qual_range = [1,5]
+
+q = 3
 
 def get_randomOrder(file, max_imgs, max_methods, methods):
     order_file = file.replace('.h5', '_idx.csv')
@@ -82,7 +83,7 @@ with h5.File(file, 'r') as f:
     progressbar_elem = sg.ProgressBar(num_images*len(method_names), orientation='h', size=(80, 20), key='progbar')
     OG_elem = sg.Image(data = get_img_data(ogs[img_index], first = True), size = (512,512))
     CGH_elem = sg.Image(data = get_img_data(f[method_names[method_index]][img_index], first = True), size = (512,512))
-    slider_elem = sg.Slider(range = (0, max_qual),
+    slider_elem = sg.Slider(range = (qual_range[0], qual_range[1]),
                             default_value=q,
                             key = '_SLIDER_',
                             orientation = 'h',
@@ -95,7 +96,7 @@ with h5.File(file, 'r') as f:
               [OG_elem, CGH_elem],
               [sg.T('Low Quality'), slider_elem, sg.T('Best Quality')],
               [sg.Button('Prev', size=(8, 2)),
-               sg.In(max_qual//2, key = '_Score_'),
+               sg.In(q, key = '_Score_'),
                sg.Button('Next', size=(8, 2))]]
     
     window = sg.Window('Image Scoring Software', layout, return_keyboard_events=True,
@@ -155,8 +156,8 @@ with h5.File(file, 'r') as f:
                 quals[method_names[method_index]][img_index] -= 1
         
         elif 'Up' in event and 'KP' not in event:
-            if quals[method_names[method_index]][img_index] == max_qual:
-                quals[method_names[method_index]][img_index] = max_qual
+            if quals[method_names[method_index]][img_index] == qual_range[1]:
+                quals[method_names[method_index]][img_index] = qual_range[1]
             else:
                 quals[method_names[method_index]][img_index] += 1
         

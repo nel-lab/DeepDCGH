@@ -8,18 +8,18 @@ Created on Mon Feb 22 18:31:32 2021
 
 import numpy as np
 import random
-
-imgs = list(range(10))
-order = np.zeros((10*4, 2))
-count = 0
-
-for i in range(10):
-    for j in range(4):
-        order[count, 0] = i
-        order[count, 1] = j
-        count+=1
-order = list(order)
-random.shuffle(order_)
+import matplotlib.pyplot as plt
+import h5py as h5
 
 #%%
-img_index, method_index = order_[10]
+filename = '/home/hoss/Documents/datasets/ForGUI.h5'
+
+with h5.File(filename, 'r') as f:
+    for ind, k in enumerate(f.keys()):
+        plt.figure(figsize=(5,5))
+        plt.imshow(f[k][51])
+        plt.axis('off')
+        plt.title(k)
+        plt.savefig(k+'.png')
+        plt.show()
+
