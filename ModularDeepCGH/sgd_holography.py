@@ -9,8 +9,7 @@ import tensorflow as tf
 
 @tf.function
 def __normalize_minmax(img):
-    img = tf.cast(img, tf.float32)
-    img -= tf.reduce_min(img, axis=[0, 1], keepdims=True)
+    img -= tf.reduce_min(tf.cast(img, tf.float32), axis=[0, 1], keepdims=True)
     img /= tf.reduce_max(img, axis=[0, 1], keepdims=True)
     return img
 

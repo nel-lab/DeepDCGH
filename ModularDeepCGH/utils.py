@@ -5,7 +5,8 @@ from tqdm import tqdm
 from glob import glob
 import os
 import tensorflow as tf
-
+import imquality.brisque as brisque_
+import pandas as pd
 
 def smartResize(img, target_size):
     cur_shape = img.shape[:-1]
@@ -203,6 +204,76 @@ def novocgh(img, Ks, lr = 0.1):
             amps.append(loss_(phi_slm).numpy())
             slms.append(phi_slm.numpy())
     return slms, amps
+
+
+
+def load_scores_fromCSV(path):
+    files = glob(path+"*.csv")
+    main_df = pd.read_csv(path+"Main.csv")
+    
+    for file in files:
+        if 'Main' not in file:
+            name = os.path.split(file.replace('.csv', ''))[1]
+            main_df[name] = np.array(pd.read_csv(file))
+    return main_df
+
+
+def tf_msssim(ref, cgh):
+    return tf.image.ssim_multiscale(ref, cgh, 255)
+    
+
+def brisque(img):
+    return brisque_.score(Image.fromarray(img))
+
+
+def accuracy_batch(y_true, y_pred):
+    denom = tf.sqrt(tf.reduce_sum(tf.pow(y_pred, 2), axis = [1, 2])*tf.reduce_sum(tf.pow(y_true, 2), axis = [1, 2]))
+    return 1 - (tf.reduce_sum(y_pred * y_true, axis = [1, 2])+1)/(denom+1)
+
+
+
+#%%
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
