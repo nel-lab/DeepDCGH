@@ -7,6 +7,10 @@ import os
 import tensorflow as tf
 import imquality.brisque as brisque_
 import pandas as pd
+from sewar.full_ref import rmse_sw as rmse_sw_
+
+def rmse_sw(gt, p):
+    return rmse_sw_(gt, p)[0]
 
 def smartResize(img, target_size):
     cur_shape = img.shape[:-1]
@@ -229,7 +233,6 @@ def brisque(img):
 def accuracy_batch(y_true, y_pred):
     denom = tf.sqrt(tf.reduce_sum(tf.pow(y_pred, 2), axis = [1, 2])*tf.reduce_sum(tf.pow(y_true, 2), axis = [1, 2]))
     return 1 - (tf.reduce_sum(y_pred * y_true, axis = [1, 2])+1)/(denom+1)
-
 
 
 #%%
