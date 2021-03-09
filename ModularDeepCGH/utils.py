@@ -9,8 +9,10 @@ import imquality.brisque as brisque_
 import pandas as pd
 from sewar.full_ref import rmse_sw as rmse_sw_
 
+
 def rmse_sw(gt, p):
     return rmse_sw_(gt, p)[0]
+
 
 def smartResize(img, target_size):
     cur_shape = img.shape[:-1]
@@ -22,6 +24,39 @@ def smartResize(img, target_size):
     img /= img.max()
     return img
 
+def smartDType(img_, dtype):
+    img = img_.copy().astype(np.float64)
+    try:
+        min_val = np.iinfo(dtype).min
+        max_val = np.iinfo(dtype).max
+        if min_val != 0:
+            img *= 2
+            img -= 1
+            img *= max_val//3.
+        else:
+            img *= max_val
+    except:
+        min_val = np.finfo(dtype).min
+        max_val = np.finfo(dtype).max
+        if min_val != 0:
+            img *= 2
+            img -= 1
+            img *= max_val//3.
+        else:
+            img *= max_val
+    return img.astype(dtype)
+
+
+def loadImageasGray(file, shape, dtype):
+    img = np.array(Image.open(file))
+    if len(img.shape) > 2:
+        img = np.mean(img, axis=-1)
+
+    if img.shape != shape:
+        img = smartResize(img, shape)
+    
+    return smartDType(img, dtype)
+    
 
 def create_datasets(method,
                     image_path,
