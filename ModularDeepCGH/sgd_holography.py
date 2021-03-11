@@ -9,6 +9,7 @@ import tensorflow as tf
 
 @tf.function
 def __normalize_minmax(img):
+    img = tf.cast(img, tf.float32)
     img -= tf.reduce_min(tf.cast(img, tf.float32), axis=[0, 1], keepdims=True)
     img /= tf.reduce_max(img, axis=[0, 1], keepdims=True)
     return img
@@ -34,7 +35,7 @@ def novocgh(img, Ks, lr = 0.1):
     phi = __gs(img)
     phi_slm = tf.Variable(phi)
     opt = tf.keras.optimizers.Adam(learning_rate = lr)
-    img = tf.convert_to_tensor(img)
+    img = tf.convert_to_tensor(img, dtype=tf.float32)
 
     def loss_(phi_slm):
         slm_cf = tf.math.exp(tf.complex(0., phi_slm))
@@ -44,14 +45,14 @@ def novocgh(img, Ks, lr = 0.1):
     def loss():
         slm_cf = tf.math.exp(tf.complex(0., phi_slm))
         img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
-        amp = tf.math.abs(img_cf)
+        amp = tf.cast(tf.math.abs(img_cf), tf.float32)
         return __accuracy(tf.square(img), tf.square(amp))
 
     for i in range(Ks[-1]+1):
         opt.minimize(loss, var_list=[phi_slm])
         if i in Ks:
-            amps.append(loss_(phi_slm).numpy())
-            slms.append(phi_slm.numpy())
+            amps.append(loss_(phi_slm))
+            slms.append(phi_slm)
     return slms, amps
 
 

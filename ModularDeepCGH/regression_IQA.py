@@ -55,7 +55,8 @@ y_tr += 0.05*np.random.uniform(-1,1,y_tr.shape)
 #%
 for i in range(len(fs.scores_)):
     print(X.columns[i], fs.scores_[i])
-#%
+    
+#%%
 model = tf.keras.Sequential([
     layers.BatchNormalization(input_shape = (num_feats,)),
     layers.Dense(units=num_feats*2, activation=None, kernel_regularizer=regularizers.l2(1e-2)),

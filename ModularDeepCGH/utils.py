@@ -213,7 +213,7 @@ def __gs(img):
     return slm_phi
 
 
-def __accuracy(y_true, y_pred):
+def accuracy(y_true, y_pred):
     denom = tf.sqrt(tf.reduce_sum(tf.pow(y_pred, 2), axis = [0, 1])*tf.reduce_sum(tf.pow(y_true, 2), axis = [0, 1]))
     return 1 - (tf.reduce_sum(y_pred * y_true, axis = [0, 1])+1)/(denom+1)
 
@@ -235,7 +235,7 @@ def novocgh(img, Ks, lr = 0.1):
         slm_cf = tf.math.exp(tf.complex(0., phi_slm))
         img_cf = tf.signal.fftshift(tf.signal.fft2d(slm_cf))
         amp = tf.math.abs(img_cf)
-        return __accuracy(tf.square(img), tf.square(amp))
+        return accuracy(tf.square(img), tf.square(amp))
 
     for i in range(Ks[-1]+1):
         opt.minimize(loss, var_list=[phi_slm])
@@ -259,6 +259,10 @@ def load_scores_fromCSV(path):
 
 def tf_msssim(ref, cgh):
     return tf.image.ssim_multiscale(ref, cgh, 255)
+
+
+def tf_ssim(ref, cgh):
+    return tf.image.ssim(ref[...,np.newaxis], cgh[...,np.newaxis], 255)
     
 
 def brisque(img):
